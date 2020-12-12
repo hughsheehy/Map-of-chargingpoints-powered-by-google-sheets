@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Google Maps map with deck.gl to render data from a Google Spreadsheet</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+        /* Always set the map height explicitly to define the size of the div
+     * element that contains the map.
+     */
+        #map {
+            height: 100%;
+        }
+
+        /* Optional: Makes the sample page fill the window. */
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* We want to have a pointer cursor when hovering a deck.gl item */
+        body.cursor-pointer .gm-style>div {
+            cursor: pointer !important;
+        }
+
+        /* Style the legend */
+        #legend {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255, 255, 255, .9);
+            padding: .5em 1em;
+        }
+
+        #legend span {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            vertical-align: top;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="legend"></div>
+
+    <script>
+        let map;
+        const fuelColorMapping = {
+            'Gas': [202, 178, 214, 194],
+            'Oil': [106, 61, 154, 194],
+            'Petcoke': [251, 154, 153, 194],
+            'Nuclear': [227, 26, 28, 194],
+            'Coal': [177, 89, 40, 194],
+            'Solar': [255, 255, 153, 194],
+            'Geothermal': [178, 223, 138, 194],
+            'Waste': [51, 160, 44, 194],
+            'Biomass': [51, 160, 44, 194],
+            'Wind': [166, 206, 227, 194],
+            'Hydro': [31, 120, 180, 194],
+            'Wave and Tidal': [31, 120, 180, 194],
+            'Storage': [253, 191, 111, 194],
+            'Cogeneration': [255, 127, 0, 194]
+        };
+
+        // Initialize the map
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {
+                    lat: 52,
+                    lng: -1
+                },
+                minZoom: 3,
+                zoom: 6,
+                clickableIcons: false,
+                disableDefaultUI: true,
+                zoomControl: true,
+                styles: [{
+                    "featureType": "all",
+                    "elementType": "all",
+                    "stylers": [
+                        { "saturation": "-94" },
+                        { "gamma": "1" },
+                        { "visibility": "simplified" },
+                        { "lightness": "-70" }
+                    ]
+                }, {
+                    "featureType": "all",
+                    "elementType": "labels",
+                    "stylers": [{ "visibility": "on" }]
+                }, {
+                    "featureType": "water",
+                    "elementType": "all",
+                    "stylers": [
+                        { "saturation": "-80" },
+                        { "lightness": "-40" }
+                    ]
+                }]
+            });
+        }
+
+        // Create a deck.gl Google Maps overlay from spreadsheet data.
+        // The data is passed directly from the JSONP callback.
+        function createOverlay(spreadsheetData) {
+            // Create GeoJSON from the spreadsheet data.
+            const data = {
+                type: 'FeatureCollection',
+                features: spreadsheetData.feed.entry.map(item => {
+                    return {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [
+                                Number(item.gsx$longitude.$t),
+                                Number(item.gsx$latitude.$t)
+                            ]
+                        },
+                        properties: {
+                            name: item.gsx$name.$t,
+                            country: item.gsx$country.$t,
+                            maxsitepower: Number(item.gsx$maxsitepower.$t) || 0,
+                            operator: item.gsx$operator.$t,
+                            comments: item.gsx$accesscomments.$t
+
+                        }
+                    }
+                })
+            };
+
+            // Create a GeoJsonLayer from the data and attach it to the map.
+            const geojsonLayer = new GeoJsonLayer({
+                id: 'geojsonLayer',
+                data: data,
+                pickable: true,
+                pointRadiusMinPixels: 2,
+                pointRadiusMaxPixels: 140,
+                wrapLongitude: true,
+                getRadius: d => d.properties.maxsitepower * 20,
+                getFillColor: (g) => (hexToRgb(stringToColour(getIfNotSet(g.properties.operator)))),
+            });
+
+
+            const overlay = new GoogleMapsOverlay({
+                layers: [geojsonLayer]
+            });
+            overlay.setMap(map);
+            createInfowindow(overlay);
+            // createLegend();
+        }
+
+        // Create an infowindow and listen for clicks on the deck.gl Layer
+        function createInfowindow(overlay) {
+            const infowindow = new google.maps.InfoWindow({
+                content: ''
+            });
+
+            // Change the cursor to a pointer on mouseover
+            map.addListener('mousemove', event => {
+                if (!overlay._deck || !overlay._deck.layerManager) {
+                    return;
+                }
+
+                const picked = overlay._deck.pickObject({
+                    x: event.pixel.x,
+                    y: event.pixel.y,
+                    radius: 4,
+                    layerIds: ['geojsonLayer']
+                });
+                document.body.classList.toggle('cursor-pointer', picked);
+            });
+
+            // Check for clicks and open or close the infowindow.
+            map.addListener('click', event => {
+                const picked = overlay._deck.pickObject({
+                    x: event.pixel.x,
+                    y: event.pixel.y,
+                    radius: 4,
+                    layerIds: ['geojsonLayer']
+                });
+
+                if (!picked) {
+                    infowindow.close();
+                    return;
+                }
+
+                infowindow.setContent(
+                    `<div>
+            <div><b>${picked.object.properties.name}</b></div>
+            <div>${picked.object.properties.country}</div>
+            <div><b>Max Site Power (KW):</b> ${picked.object.properties.maxsitepower}</div>
+            <div><b>Operator:</b> ${picked.object.properties.operator}</div>
+            <div><b>Comments:</b> ${picked.object.properties.comments}</div>
+
+          </div>`
+                );
+                infowindow.setPosition({
+                    lng: picked.lngLat[0],
+                    lat: picked.lngLat[1]
+                });
+                infowindow.open(map);
+            });
+        }
+
+        // // Render a legend to show what the colors mean
+        // // function createLegend() {
+        //     document.getElementById('legend').innerHTML +=
+        //         Object.keys(fuelColorMapping).map(fuel => `<div>
+        //     <span style="background: rgba(${fuelColorMapping[fuel]})"></span>
+        //     ${fuel}
+        //   </div>`
+        //         ).join('');
+        // }
+
+
+
+        function getIfNotSet(value) {
+            if (typeof (value) === 'undefined') {
+                return "blank";
+            } else if (value === null) {
+                return "blank";
+            } else if (value === 0) {
+                return "blank";
+            } else {
+                return value;
+            }
+        }
+
+        var stringToColour = function (str) {
+            var hash = 0;
+            for (var i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            var colour = '#';
+            for (var i = 0; i < 3; i++) {
+                var value = (hash >> (i * 8)) & 0xFF;
+                colour += ('00' + value.toString(16)).substr(-2);
+            }
+            return colour;
+        }
+
+        function hexToRgb(hex) {
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? [
+                parseInt(result[1], 16),
+                parseInt(result[2], 16),
+                parseInt(result[3], 16), 255
+            ] : null;
+        }
+
+
+    </script>
+
+    <!--
+    To use this in your own project you need to have your own Google Maps Api key.
+    https://developers.google.com/maps/documentation/javascript/get-api-key
+  -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyChZfoKbilN1hEpo-AGJWLtFS1_EOwh8tY&callback=initMap">
+    </script>
+    <!--
+    deck.gl is needed to render the data onto the Google Map
+  -->
+    <script src="https://unpkg.com/deck.gl@7.0.9/dist.min.js"></script>
+
+    <!--
+    This is the spreadsheet that was used for this example:
+    https://docs.google.com/spreadsheets/d/1MsFYOQlys_jyTACIZRbk3VWX9qaUdfrsr_r2Y-oxuZo
+    To be able to pull data from a spreadsheet, it needs to be
+    "Published to the web". In the spreadsheet go to
+    "File" -> "Publish to the web" -> Click the publish button
+    The only thing you need to swap out in the script tag below is
+    the spreadsheet id .../list/YOUR_SPREADSHEET_ID/1/...
+  -->
+    <script
+        src="https://spreadsheets.google.com/feeds/list/112Wv_lGic1ZBbju_ETLnDwrpRFgJg06MXN6QH3Xg0uo/1/public/values?alt=json-in-script&callback=createOverlay">
+        </script>
+</body>
+
+</html>
