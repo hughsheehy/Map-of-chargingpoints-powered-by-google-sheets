@@ -134,13 +134,13 @@
             // Create a GeoJsonLayer from the data and attach it to the map.
             const geojsonLayer = new GeoJsonLayer({
                 id: 'geojsonLayer',
-                data: data,
+                data: "https://qmobilitymapsdata.blob.core.windows.net/geojsonformaps/GBIErawpoigeo.json",
                 pickable: true,
                 pointRadiusMinPixels: 2,
                 pointRadiusMaxPixels: 140,
                 wrapLongitude: true,
-                getRadius: d => d.properties.maxsitepower * 20,
-                getFillColor: (g) => (hexToRgb(stringToColour(getIfNotSet(g.properties.operator)))),
+                getRadius: (f) => (10 * f.properties.Connectors[0].PowerKW),
+                getFillColor: (g) => (hexToRgb(stringToColour(getIfNotSet(g.properties.Operator.Title)))),
             });
 
 
@@ -189,11 +189,11 @@
 
                 infowindow.setContent(
                     `<div>
-            <div><b>${picked.object.properties.name}</b></div>
-            <div>${picked.object.properties.country}</div>
-            <div><b>Max Site Power (KW):</b> ${picked.object.properties.maxsitepower}</div>
-            <div><b>Operator:</b> ${picked.object.properties.operator}</div>
-            <div><b>Comments:</b> ${picked.object.properties.comments}</div>
+            <div><b>${picked.object.properties.Name}</b></div>
+            <div>${picked.object.properties.Country}</div>
+            <div><b>Max Site Power (KW):</b> ${picked.object.properties.Connectors[0].PowerKW}</div>
+            <div><b>Operator:</b> ${picked.object.properties.Operator.Title}</div>
+            <div><b>Access Comments:</b> ${picked.object.properties["Access Comments"]}</div>
 
           </div>`
                 );
@@ -204,18 +204,6 @@
                 infowindow.open(map);
             });
         }
-
-        // // Render a legend to show what the colors mean
-        // // function createLegend() {
-        //     document.getElementById('legend').innerHTML +=
-        //         Object.keys(fuelColorMapping).map(fuel => `<div>
-        //     <span style="background: rgba(${fuelColorMapping[fuel]})"></span>
-        //     ${fuel}
-        //   </div>`
-        //         ).join('');
-        // }
-
-
 
         function getIfNotSet(value) {
             if (typeof (value) === 'undefined') {
