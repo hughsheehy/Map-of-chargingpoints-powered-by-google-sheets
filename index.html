@@ -25,57 +25,24 @@
         body.cursor-pointer .gm-style>div {
             cursor: pointer !important;
         }
-
-        /* Style the legend */
-        #legend {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background: rgba(255, 255, 255, .9);
-            padding: .5em 1em;
-        }
-
-        #legend span {
-            width: 1em;
-            height: 1em;
-            display: inline-block;
-            vertical-align: top;
-        }
     </style>
 </head>
 
 <body>
     <div id="map"></div>
-    <div id="legend"></div>
 
     <script>
         let map;
-        //         const fuelColorMapping = {
-        //             'Gas': [202, 178, 214, 194],
-        //             'Oil': [106, 61, 154, 194],
-        //             'Petcoke': [251, 154, 153, 194],
-        //             'Nuclear': [227, 26, 28, 194],
-        //             'Coal': [177, 89, 40, 194],
-        //             'Solar': [255, 255, 153, 194],
-        //             'Geothermal': [178, 223, 138, 194],
-        //             'Waste': [51, 160, 44, 194],
-        //             'Biomass': [51, 160, 44, 194],
-        //             'Wind': [166, 206, 227, 194],
-        //             'Hydro': [31, 120, 180, 194],
-        //             'Wave and Tidal': [31, 120, 180, 194],
-        //             'Storage': [253, 191, 111, 194],
-        //             'Cogeneration': [255, 127, 0, 194]
-        //         };
 
         // Initialize the map
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
                 center: {
-                    lat: 52,
-                    lng: -1
+                    lat: 51.462,
+                    lng: -0.19
                 },
+                zoom: 12,
                 minZoom: 3,
-                zoom: 7,
                 clickableIcons: false,
                 disableDefaultUI: true,
                 zoomControl: true,
@@ -83,10 +50,10 @@
                     "featureType": "all",
                     "elementType": "all",
                     "stylers": [
-                        { "saturation": "-94" },
+                        { "saturation": "-74" },
                         { "gamma": "1" },
                         { "visibility": "simplified" },
-                        { "lightness": "-70" }
+                        { "lightness": "-30" }
                     ]
                 }, {
                     "featureType": "all",
@@ -140,6 +107,17 @@
                 pointRadiusMaxPixels: 80,
                 opacity: 0.25,
                 wrapLongitude: true,
+                autoHighlight: true,
+                // the transition effect doesn't seem to work most of the time, and makes no clear different to "prettiness"
+                // transitions: {
+                //     getRadius: {
+                //         type: "spring",
+                //         stiffness: 0.1,
+                //         damping: 0.15,
+                //         enter: (_) => [0],
+                //         duration: 10000,
+                //     },
+                // },
                 getRadius: (f) => (10 * f.properties.Connectors[0].PowerKW),
                 getFillColor: (g) => (hexToRgb(stringToColour(getIfNotSet(g.properties.Operator.Title)))),
             });
@@ -175,7 +153,9 @@
             });
 
             // Check for clicks and open or close the infowindow.
-            map.addListener('click', event => {
+            map.addListener('mousemove', event => {
+                // set it back to click if it's not working on apple or many android devices
+                // map.addListener('click', event => {
                 const picked = overlay._deck.pickObject({
                     x: event.pixel.x,
                     y: event.pixel.y,
