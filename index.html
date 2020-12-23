@@ -189,11 +189,12 @@
 
                 infowindow.setContent(
                     `<div>
-            <div><b>Operator:</b> ${picked.object.properties.Operator.Title}</div>
+            <div><b> ${picked.object.properties.Operator.Title}</b></div>
             <div><b>${picked.object.properties.Name}</b></div>
-            <div>${picked.object.properties.Country}</div>
             <div><b>Max Site Power (KW):</b> ${picked.object.properties.Connectors[0].PowerKW}</div>
             <div><b>Access Comments:</b> ${picked.object.properties["Access Comments"]}</div>
+            <div>${picked.object.properties.Country}</div>
+
 
           </div>`
                 );
